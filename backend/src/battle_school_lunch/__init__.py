@@ -1,0 +1,1 @@
+"""Battle School Lunch backend."""
