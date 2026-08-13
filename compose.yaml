@@ -21,9 +21,11 @@ services:
   frontend:
     build:
       context: ./frontend
+    environment:
+      BACKEND_BASE_URL: http://backend:8000
+      BACKEND_HOST: backend
     ports:
       - "3000:8080"
     depends_on:
       backend:
         condition: service_healthy
-
