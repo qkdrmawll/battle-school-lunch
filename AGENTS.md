@@ -3,9 +3,86 @@
 ## 프로젝트 개요
 
 급식배틀은 NEIS 공개 API를 활용해 초중고 급식 메뉴를 조회하고 분석하는
-웹 애플리케이션을 단계적으로 구현하는 워크숍 프로젝트입니다. 현재 저장소에는
-워크숍 문서와 API 명세가 있으며, 이후 Python 백엔드와 TypeScript 프론트엔드,
-배포 자동화 및 에이전트 워크플로가 추가될 수 있습니다.
+웹 애플리케이션을 단계적으로 구현하는 워크숍 프로젝트입니다. 현재 앱은 학교명
+검색, 학교 선택, 기간별 중식 조회, 로딩·빈 결과·오류 상태 표시를 지원합니다.
+
+- `frontend/`: React 19, TypeScript, Vite 기반 단일 페이지 앱
+- `backend/`: Python 3.12, FastAPI, Pydantic, HTTPX 기반 API 서버
+- `compose.yaml`: 프론트엔드와 백엔드의 로컬 통합 실행 환경
+- `data/openapi.json`: 백엔드가 연동하는 NEIS 공개 API 기준 명세
+- `src/openapi.json`: 프론트엔드와 백엔드 사이의 애플리케이션 API 계약
+- `docs/`: 단계별 워크숍 가이드
+- `PRD.md`, `TRD.md`: 제품 및 기술 요구사항
+
+브라우저는 NEIS를 직접 호출하지 않습니다. 프론트엔드는 `/api` 경로로 백엔드를
+호출하고, 백엔드만 환경 변수의 API 키를 사용해 NEIS와 통신합니다.
+
+## 아키텍처 및 구현 경계
+
+### 백엔드
+
+- `api/routes.py`는 HTTP 경로, 쿼리 및 응답 모델 연결만 담당합니다.
+- `services/schools.py`는 입력 검증, 학교 확인, 날짜 변환, 메뉴 정규화 및 정렬을
+  담당합니다.
+- `clients/neis.py`는 NEIS 요청, 페이지네이션, 외부 응답 검증과 외부 오류 변환을
+  담당합니다.
+- `models.py`의 Pydantic 모델이 공개 JSON 응답 형식의 기준입니다. Python에서는
+  `snake_case`, JSON에서는 기존 `camelCase` 별칭을 유지합니다.
+- 애플리케이션 오류는 `AppError` 계층과
+  `{"error": {"code": "...", "message": "..."}}` 형식을 사용합니다.
+- NEIS의 데이터 없음은 빈 배열로 반환하고, 연결 실패나 잘못된 외부 응답을 빈
+  결과로 가장하지 않습니다.
+
+### 프론트엔드
+
+- `src/App.tsx`는 학교 검색, 학교 선택, 날짜 입력과 요청 상태를 관리합니다.
+- `src/api/client.ts`만 백엔드 HTTP 요청을 담당하며, 받은 JSON을 런타임에
+  검증합니다.
+- `src/types.ts`의 공개 타입은 백엔드 응답 모델 및 `src/openapi.json`과
+  일치해야 합니다.
+- 요청 상태는 `idle`, `loading`, `success`, `empty`, `error`를 구분하고 기존의
+  한국어 사용자 메시지와 접근 가능한 상태 알림 패턴을 유지합니다.
+- 새 검색, 학교 변경 또는 날짜 변경 시 진행 중인 관련 요청을 취소하는 현재
+  동작을 보존합니다.
+
+### API 계약
+
+- `GET /health`: 백엔드 상태 확인
+- `GET /api/schools?query={학교명}`: 학교 검색
+- `GET /api/schools/{schoolCode}/meals?educationOfficeCode=...&from=YYYY-MM-DD&to=YYYY-MM-DD`:
+  선택한 학교의 기간별 중식 조회
+
+공개 경로, 쿼리 이름 또는 응답 필드를 바꿀 때는 백엔드 모델과 라우트,
+프론트엔드 타입과 클라이언트, `src/openapi.json` 및 관련 테스트를 한 변경에서
+함께 갱신합니다. NEIS 연동 필드를 바꿀 때는 `data/openapi.json`도 확인합니다.
+
+## 개발 및 실행 명령
+
+- 전체 앱: 저장소 루트에서 `docker compose up --build`
+- Compose 검증: 저장소 루트에서 `docker compose config`
+- 백엔드 설치: `backend`에서 `python -m pip install -e ".[dev]"`
+- 백엔드 실행: `backend`에서
+  `uvicorn battle_school_lunch.main:app --reload`
+- 백엔드 테스트: `backend`에서 `pytest`
+- 프론트엔드 설치: `frontend`에서 재현 가능한 설치는 `npm ci`
+- 프론트엔드 실행: `frontend`에서 `npm run dev`
+- 프론트엔드 빌드 및 타입 검사: `frontend`에서 `npm run build`
+- 프론트엔드 단위 테스트: `frontend`에서 `npm test`
+- 프론트엔드 E2E 테스트: `frontend`에서 `npm run test:e2e`
+
+로컬 통합 실행 포트는 프론트엔드 `3000`, 백엔드 `8000`입니다. 프론트엔드 개발
+서버와 배포용 Nginx 모두 `/api` 요청을 백엔드로 전달하는 구조를 유지합니다.
+
+## 환경 변수
+
+- `NEIS_API_KEY`: NEIS에서 발급한 키. 없거나 `sample`이면 제한된 샘플 모드로
+  동작합니다.
+- `FRONTEND_ORIGIN`: CORS에 허용할 구체적인 프론트엔드 origin. 와일드카드는
+  허용하지 않습니다.
+- `NEIS_TIMEOUT_SECONDS`: NEIS 요청 제한 시간. 기본값은 10초입니다.
+
+실제 키를 저장소에 기록하지 말고 `.env.example`에는 예시 또는 빈 값만
+유지합니다.
 
 ## 일반 작업 지침
 
@@ -21,6 +98,9 @@
 
 ## Python 가이드라인
 
+- Python 3.12 이상과 `backend/pyproject.toml`의 의존성 범위를 유지합니다.
+- 비동기 라우트부터 HTTPX 클라이언트까지 async 흐름을 유지하고 블로킹 네트워크
+  호출을 추가하지 않습니다.
 - 공개 함수, 메서드 및 주요 데이터 구조에는 구체적인 타입을 사용하고 타입
   안정성을 우회하는 광범위한 `Any` 사용을 피합니다.
 - 입력과 외부 API 응답은 경계에서 검증하며, 실패를 성공 값이나 빈 값으로
@@ -34,6 +114,8 @@
 
 ## TypeScript 가이드라인
 
+- React 컴포넌트는 함수형 컴포넌트와 훅을 사용하고, 네트워크 접근은
+  `src/api/client.ts`에 집중시킵니다.
 - `strict` 설정과 기존 컴파일러 규칙을 유지하고, 타입 오류를 `any`, 불필요한
   타입 단언 또는 검사 비활성화로 회피하지 않습니다.
 - 외부 데이터와 사용자 입력은 런타임에 검증하고, 선택 값과 오류 상태를 타입에
@@ -50,6 +132,10 @@
 - 변경된 동작의 정상 경로, 실패 경로 및 중요한 경계 조건을 테스트합니다.
 - 버그 수정에는 가능하면 수정 전 실패하고 수정 후 통과하는 회귀 테스트를
   추가합니다.
+- 백엔드 API와 서비스 변경은 `backend/tests/`의 관련 pytest를, 프론트엔드
+  동작 변경은 `frontend/src/*.test.tsx`의 Vitest 테스트를 갱신합니다. 전체 사용자
+  흐름이나 프록시 경계를 바꾸면 `frontend/tests/e2e/`의 Playwright 테스트도
+  갱신합니다.
 - 저장소에 실제로 존재하는 매니페스트, 스크립트, 설정 및 CI 워크플로를 확인한
   뒤 구성된 테스트, 포맷팅, 린트, 타입 검사와 빌드만 실행합니다.
 - 아직 구성되지 않은 도구를 설치하거나 실행 명령을 임의로 만들지 않습니다.
