@@ -30,6 +30,25 @@ NEIS 공개 API를 활용해 초중고 급식 메뉴를 조회하고 AI 에이�
 > [!NOTE]
 > 완성된 애플리케이션을 직접 실행하거나 구현 결과를 비교하려면 [데모 앱 리포지토리](https://github.com/devkimchi/battle-school-lunch)를 참고하세요.
 
+### 애플리케이션 실행
+
+1. `.env.example`을 `.env`로 복사하고 `NEIS_API_KEY`를 설정합니다. 키가 없으면
+   조회 건수가 제한된 NEIS `sample` 키를 사용할 수 있습니다.
+2. Docker가 실행 중인 환경에서 다음 명령을 실행합니다.
+
+   ```shell
+   docker compose up --build
+   ```
+
+3. 브라우저에서 `http://localhost:3000`을 엽니다. 백엔드 API 문서는
+   `http://localhost:8000/docs`, 상태 확인은 `http://localhost:8000/health`에서
+   확인할 수 있습니다.
+
+로컬 개발 시에는 `backend`에서 `python -m pip install -e ".[dev]"` 후
+`uvicorn battle_school_lunch.main:app --reload`을, `frontend`에서
+`npm install` 후 `npm run dev`를 실행합니다. 프론트엔드 개발 서버는 `/api`
+요청을 `http://localhost:8000`으로 전달합니다.
+
 ## 커리큘럼
 
 | 단계 | 주제                                                                         |
