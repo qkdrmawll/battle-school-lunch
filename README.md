@@ -49,6 +49,23 @@ NEIS 공개 API를 활용해 초중고 급식 메뉴를 조회하고 AI 에이�
 `npm install` 후 `npm run dev`를 실행합니다. 프론트엔드 개발 서버는 `/api`
 요청을 `http://localhost:8000`으로 전달합니다.
 
+### Azure 배포
+
+`azd init --from-code`와 `azd infra gen`으로 생성한 Azure Container Apps
+구성이 `azure.yaml`과 `infra/`에 포함되어 있습니다. Azure에 로그인한 뒤 다음
+명령으로 환경을 만들고 배포합니다.
+
+```shell
+azd auth login
+azd env new battle-school-lunch-dev
+azd env set NEIS_API_KEY "<발급받은 키>"
+azd up
+```
+
+NEIS API 키가 없으면 `azd env set`을 생략할 수 있으며 제한된 `sample` 키가
+사용됩니다. 배포되는 백엔드는 Container Apps 환경 내부에서만 접근 가능하고,
+외부 요청은 공개 프론트엔드의 `/api` 프록시를 통해 전달됩니다.
+
 ## 커리큘럼
 
 | 단계 | 주제                                                                         |
